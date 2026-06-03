@@ -1,0 +1,804 @@
+// ============================================================
+// 宝贝星球 (Baby Planet) - Prisma Schema
+// 技术栈: Next.js 14 + Prisma + PostgreSQL
+// ============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // 用于 Prisma migrations（Supabase 连接池需要）
+}
+
+// ============================================================
+// 枚举定义
+// ============================================================
+
+enum UserRole {
+  USER
+  ADMIN
+  EXPERT
+}
+
+enum FamilyMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum BloodType {
+  A
+  B
+  AB
+  O
+  UNKNOWN
+}
+
+enum DailyRecordType {
+  FEEDING
+  SLEEP
+  DIAPER
+  MEDICINE
+  TEMPERATURE
+}
+
+enum VaccineStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+  OVERDUE
+}
+
+enum MilestoneCategory {
+  MOTOR
+  LANGUAGE
+  COGNITIVE
+  SOCIAL
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PostType {
+  DISCUSSION
+  QUESTION
+  EXPERIENCE
+  MILESTONE
+}
+
+enum ContentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CircleMemberRole {
+  MODERATOR
+  MEMBER
+}
+
+enum ConsultationStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ChatMessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+enum PointTransactionType {
+  EARN
+  SPEND
+}
+
+enum PointSource {
+  SIGNUP
+  DAILY_CHECKIN
+  FIRST_RECORD
+  CONSULTATION
+  REFERRAL
+  GIFT
+}
+
+// ============================================================
+// 1. 用户与认证
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // 邮箱登录用，bcrypt 加密存储
+  phone         String?   @unique
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // 关联
+  accounts             Account[]
+  sessions             Session[]
+  ownedFamilies        Family[]           @relation("FamilyOwner")
+  familyMemberships    FamilyMember[]
+  uploadedPhotos       Photo[]
+  dailyRecords         DailyRecord[]
+  authoredArticles     Article[]          @relation("ArticleAuthor")
+  authoredPosts        Post[]
+  authoredComments     Comment[]
+  likes                Like[]
+  circleMemberships    CircleMember[]
+  expertProfile        Expert?            @relation("ExpertUser")
+  consultations        Consultation[]     @relation("ConsultationUser")
+  sentChatMessages     ChatMessage[]
+  pointBalance         PointBalance?
+  pointTransactions    PointTransaction[]
+  freeConsultations    FreeConsultation[]
+  pushSubscriptions    PushSubscription[]
+  notifications        Notification[]
+  moderationLogs       ModerationLog[]    @relation("Moderator")
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([identifier, token])
+}
+
+// ============================================================
+// 2. 家庭组
+// ============================================================
+
+model Family {
+  id         String   @id @default(cuid())
+  name       String
+  inviteCode String   @unique @db.VarChar(20)
+  ownerId    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  owner   User             @relation("FamilyOwner", fields: [ownerId], references: [id])
+  members FamilyMember[]
+  babies  Baby[]
+  invites FamilyInvite[]
+
+  @@index([ownerId])
+  @@index([inviteCode])
+}
+
+model FamilyMember {
+  id       String           @id @default(cuid())
+  familyId String
+  userId   String
+  role     FamilyMemberRole @default(MEMBER)
+  joinedAt DateTime         @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
+  @@index([familyId])
+  @@index([userId])
+}
+
+model FamilyInvite {
+  id         String       @id @default(cuid())
+  familyId   String
+  email      String
+  token      String       @unique
+  status     InviteStatus @default(PENDING)
+  expiresAt  DateTime
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([email])
+  @@index([token])
+}
+
+// ============================================================
+// 3. 宝宝档案
+// ============================================================
+
+model Baby {
+  id            String   @id @default(cuid())
+  familyId      String
+  name          String
+  gender        Gender?
+  birthday      DateTime?
+  avatarUrl     String?
+  bloodType     BloodType?
+  birthWeight   Decimal? @db.Decimal(4, 2) // 出生体重(kg)
+  birthHeight   Decimal? @db.Decimal(4, 1) // 出生身高(cm)
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  family         Family          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  dailyRecords   DailyRecord[]
+  growthRecords  GrowthRecord[]
+  vaccineRecords VaccineRecord[]
+  milestoneRecords MilestoneRecord[]
+  photos         Photo[]
+  photoAlbums    PhotoAlbum[]
+  consultations  Consultation[]
+
+  @@index([familyId])
+}
+
+model DailyRecord {
+  id        String           @id @default(cuid())
+  babyId    String
+  userId    String
+  type      DailyRecordType
+  startTime DateTime
+  endTime   DateTime?
+  data      Json?            // 灵活数据：喂奶量/时长/体温等
+  notes     String?          @db.Text
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  baby Baby @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([babyId])
+  @@index([userId])
+  @@index([type])
+  @@index([startTime])
+}
+
+model GrowthRecord {
+  id                 String   @id @default(cuid())
+  babyId             String
+  date               DateTime
+  weight             Decimal? @db.Decimal(5, 2) // 体重(kg)
+  height             Decimal? @db.Decimal(5, 1) // 身高(cm)
+  headCircumference  Decimal? @db.Decimal(4, 1) // 头围(cm)
+  weightPercentile   Float?   // 体重百分位
+  heightPercentile   Float?   // 身高百分位
+  headPercentile     Float?   // 头围百分位
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  baby Baby @relation(fields: [babyId], references: [id], onDelete: Cascade)
+
+  @@index([babyId])
+  @@index([date])
+}
+
+// ============================================================
+// 4. 疫苗与里程碑
+// ============================================================
+
+model Vaccine {
+  id                   String   @id @default(cuid())
+  name                 String
+  description          String?  @db.Text
+  recommendedAgeMonths Int      // 建议接种月龄
+  isRequired           Boolean  @default(true) // 是否为一类(免费/必打)疫苗
+  country              String   @default("CN")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  records VaccineRecord[]
+
+  @@index([recommendedAgeMonths])
+  @@index([country])
+}
+
+model VaccineRecord {
+  id            String        @id @default(cuid())
+  babyId        String
+  vaccineId     String?
+  status        VaccineStatus @default(PENDING)
+  scheduledDate DateTime?     // 计划接种日期
+  actualDate    DateTime?     // 实际接种日期
+  notes         String?       @db.Text
+  hospital      String?       // 接种医院
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  baby    Baby     @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  vaccine Vaccine? @relation(fields: [vaccineId], references: [id])
+
+  @@unique([babyId, vaccineId, scheduledDate])
+  @@index([babyId])
+  @@index([vaccineId])
+  @@index([status])
+}
+
+model Milestone {
+  id                String            @id @default(cuid())
+  category          MilestoneCategory
+  title             String
+  description       String?           @db.Text
+  typicalAgeMonths  Int               // 典型达标月龄
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  records MilestoneRecord[]
+
+  @@index([category])
+  @@index([typicalAgeMonths])
+}
+
+model MilestoneRecord {
+  id          String    @id @default(cuid())
+  babyId      String
+  milestoneId String
+  achievedAt  DateTime  // 达成时间
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  baby      Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  milestone Milestone @relation(fields: [milestoneId], references: [id])
+
+  @@unique([babyId, milestoneId])
+  @@index([babyId])
+  @@index([milestoneId])
+}
+
+// ============================================================
+// 5. 成长相册
+// ============================================================
+
+model Photo {
+  id           String   @id @default(cuid())
+  babyId       String
+  url          String
+  thumbnailUrl String?
+  caption      String?  @db.Text
+  aiTags       String[] // AI 识别标签
+  takenAt      DateTime? // 照片拍摄时间
+  uploadedAt   DateTime  @default(now())
+  uploadedBy   String?   // 上传者 userId
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  baby       Baby            @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  uploader   User?           @relation(fields: [uploadedBy], references: [id])
+  albumItems PhotoAlbumItem[]
+
+  @@index([babyId])
+  @@index([takenAt])
+}
+
+model PhotoAlbum {
+  id          String   @id @default(cuid())
+  babyId      String
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  baby  Baby            @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  items PhotoAlbumItem[]
+
+  @@index([babyId])
+}
+
+model PhotoAlbumItem {
+  id        String   @id @default(cuid())
+  albumId   String
+  photoId   String
+  createdAt DateTime @default(now())
+
+  album PhotoAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  photo Photo      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, photoId])
+  @@index([albumId])
+  @@index([photoId])
+}
+
+// ============================================================
+// 6. 知识库
+// ============================================================
+
+model Article {
+  id           String        @id @default(cuid())
+  title        String
+  slug         String        @unique
+  content      String        @db.Text
+  excerpt      String?       @db.VarChar(500) // 摘要
+  coverImage   String?
+  category     String?
+  tags         String[]
+  authorId     String
+  status       ArticleStatus @default(DRAFT)
+  publishedAt  DateTime?
+  viewCount    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  author     User             @relation("ArticleAuthor", fields: [authorId], references: [id])
+  categoryRef ArticleCategory? @relation(fields: [categoryId], references: [id])
+  categoryId String?
+
+  @@index([authorId])
+  @@index([slug])
+  @@index([status])
+  @@index([category])
+  @@index([categoryId])
+  @@index([publishedAt])
+}
+
+model ArticleCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?  @db.VarChar(500)
+  parentId    String?  // 自引用：父分类
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent   ArticleCategory? @relation("CategoryTree", fields: [parentId], references: [id])
+  children ArticleCategory[] @relation("CategoryTree")
+  articles Article[]
+
+  @@index([parentId])
+  @@index([slug])
+}
+
+// ============================================================
+// 7. 社区
+// ============================================================
+
+model Circle {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  icon        String?
+  memberCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts    Post[]
+  members  CircleMember[]
+
+  @@index([name])
+}
+
+model Post {
+  id           String        @id @default(cuid())
+  circleId     String
+  authorId     String
+  title        String
+  content      String        @db.Text
+  type         PostType      @default(DISCUSSION)
+  status       ContentStatus @default(PENDING)
+  likeCount    Int           @default(0)
+  commentCount Int           @default(0)
+  isPinned     Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  circle   Circle    @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id])
+  comments Comment[]
+  likes    Like[]
+
+  @@index([circleId])
+  @@index([authorId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String        @db.Text
+  parentId  String?       // 自引用：父评论
+  status    ContentStatus @default(PENDING)
+  likeCount Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id])
+  parent   Comment?  @relation("CommentTree", fields: [parentId], references: [id])
+  children Comment[] @relation("CommentTree")
+  likes    Like[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([status])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String?
+  commentId String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@index([userId])
+  @@index([postId])
+  @@index([commentId])
+}
+
+model CircleMember {
+  id       String           @id @default(cuid())
+  circleId String
+  userId   String
+  role     CircleMemberRole @default(MEMBER)
+  joinedAt DateTime         @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  circle Circle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([circleId, userId])
+  @@index([circleId])
+  @@index([userId])
+}
+
+// ============================================================
+// 8. 专家咨询（模拟支付）
+// ============================================================
+
+model Expert {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  title              String?  // 职称，如"主任医师"
+  specialty          String?  // 专长领域
+  bio                String?  @db.Text
+  avatarUrl          String?
+  price              Int      @default(0) // 咨询费用（积分）
+  isAvailable        Boolean  @default(true)
+  rating             Decimal  @default(5.0) @db.Decimal(3, 2)
+  consultationCount  Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user          User           @relation("ExpertUser", fields: [userId], references: [id])
+  consultations Consultation[]
+
+  @@index([userId])
+  @@index([isAvailable])
+  @@index([specialty])
+}
+
+model Consultation {
+  id          String              @id @default(cuid())
+  expertId    String
+  userId      String
+  babyId      String?
+  status      ConsultationStatus  @default(PENDING)
+  scheduledAt DateTime?           // 预约时间
+  duration    Int?                // 时长(分钟)
+  pointsCost  Int                 @default(0) // 消耗积分
+  notes       String?             @db.Text
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  expert   Expert        @relation(fields: [expertId], references: [id])
+  user     User          @relation("ConsultationUser", fields: [userId], references: [id])
+  baby     Baby?         @relation(fields: [babyId], references: [id])
+  messages ChatMessage[]
+
+  @@index([expertId])
+  @@index([userId])
+  @@index([babyId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model ChatMessage {
+  id              String           @id @default(cuid())
+  consultationId  String
+  senderId        String
+  content         String           @db.Text
+  type            ChatMessageType  @default(TEXT)
+  createdAt       DateTime         @default(now())
+
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([consultationId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// 9. 积分系统（模拟支付）
+// ============================================================
+
+model PointBalance {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  balance     Int      @default(0) // 当前积分余额
+  totalEarned Int      @default(0) // 累计获得
+  totalSpent  Int      @default(0) // 累计消费
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PointTransaction {
+  id          String              @id @default(cuid())
+  userId      String
+  amount      Int                 // 正数=获得，负数=消费
+  type        PointTransactionType
+  source      PointSource
+  description String?
+  relatedId   String?             // 关联ID（如consultationId等）
+  createdAt   DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([source])
+  @@index([createdAt])
+}
+
+model FreeConsultation {
+  id        String   @id @default(cuid())
+  userId    String
+  month     String   @db.VarChar(7) // 格式: YYYY-MM
+  usedCount Int      @default(0)
+  maxCount  Int      @default(3)   // 每月免费次数上限
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month])
+  @@index([userId])
+  @@index([month])
+}
+
+// ============================================================
+// 10. 推送通知
+// ============================================================
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@unique([userId, endpoint])
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String
+  body       String?  @db.Text
+  type       String   // 通知类型：system/comment/like/consultation/vaccine等
+  isRead     Boolean  @default(false)
+  relatedId  String?  // 关联资源ID
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================================
+// 11. 内容审核
+// ============================================================
+
+model SensitiveWord {
+  id        String   @id @default(cuid())
+  word      String   @unique
+  category  String?  // 分类：政治/色情/暴力/广告等
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([word])
+  @@index([isActive])
+}
+
+model ModerationLog {
+  id           String   @id @default(cuid())
+  targetType   String   // Post/Comment/Article等
+  targetId     String
+  action       String   // flag/remove/approve/ban等
+  reason       String?  @db.Text
+  moderatorId  String?  // 人工审核者（null表示自动审核）
+  autoFlagged  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  moderator User? @relation("Moderator", fields: [moderatorId], references: [id])
+
+  @@index([targetType, targetId])
+  @@index([moderatorId])
+  @@index([action])
+  @@index([createdAt])
+}

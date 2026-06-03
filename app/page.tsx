@@ -1,101 +1,146 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+import Link from 'next/link'
+import { useAuth } from '@/components/layout/auth-provider'
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+export default function HomePage() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 text-6xl">🌍</div>
+          <p className="text-gray-600">加载中...</p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+    )
+  }
+
+  if (user) {
+    return <AuthenticatedHome userName={user.user_metadata?.name || user.email?.split('@')[0] || '用户'} />
+  }
+
+  return <LandingPage />
+}
+
+function LandingPage() {
+  return (
+    <div className="flex min-h-[calc(100vh-64px)] flex-col items-center justify-center p-8">
+      <div className="text-center">
+        <div className="mb-6 text-8xl">🌍</div>
+        <h1 className="mb-4 text-4xl font-bold text-gray-800">
+          宝贝星球
+        </h1>
+        <p className="mb-8 text-xl text-gray-600">
+          陪伴宝宝每一步成长的智能育儿助手
+        </p>
+
+        <div className="mb-12 grid max-w-md gap-4 text-left">
+          <div className="flex items-start gap-3 rounded-xl bg-pink-50 p-4">
+            <span className="text-2xl">📝</span>
+            <div>
+              <h3 className="font-semibold">轻松记录</h3>
+              <p className="text-sm text-gray-600">喂养、睡眠、换尿布，一键记录</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 rounded-xl bg-blue-50 p-4">
+            <span className="text-2xl">📈</span>
+            <div>
+              <h3 className="font-semibold">生长曲线</h3>
+              <p className="text-sm text-gray-600">WHO 标准百分位，科学追踪发育</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 rounded-xl bg-green-50 p-4">
+            <span className="text-2xl">🤖</span>
+            <div>
+              <h3 className="font-semibold">AI 智能</h3>
+              <p className="text-sm text-gray-600">照片自动分类，零成本 AI 识别</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 rounded-xl bg-purple-50 p-4">
+            <span className="text-2xl">👩‍⚕️</span>
+            <div>
+              <h3 className="font-semibold">专家咨询</h3>
+              <p className="text-sm text-gray-600">在线问诊，每月 2 次免费咨询</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link
+            href="/auth/register"
+            className="rounded-xl bg-pink-500 px-8 py-4 text-lg font-semibold text-white shadow-lg hover:bg-pink-600"
+          >
+            免费注册
+          </Link>
+          <Link
+            href="/auth/login"
+            className="rounded-xl border-2 border-pink-500 px-8 py-4 text-lg font-semibold text-pink-500 hover:bg-pink-50"
+          >
+            登录
+          </Link>
+        </div>
+      </div>
     </div>
-  );
+  )
+}
+
+function AuthenticatedHome({ userName }: { userName: string }) {
+  return (
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-800">
+          👋 你好，{userName}！
+        </h1>
+        <p className="text-gray-600">今天宝宝怎么样？</p>
+      </div>
+
+      <div className="mb-8 grid grid-cols-2 gap-4">
+        <Link
+          href="/baby"
+          className="flex flex-col items-center rounded-2xl bg-pink-50 p-6 transition-transform hover:scale-105"
+        >
+          <span className="mb-2 text-4xl">👶</span>
+          <span className="font-semibold">我的宝宝</span>
+          <span className="text-sm text-gray-500">记录成长</span>
+        </Link>
+        <Link
+          href="/community"
+          className="flex flex-col items-center rounded-2xl bg-blue-50 p-6 transition-transform hover:scale-105"
+        >
+          <span className="mb-2 text-4xl">💬</span>
+          <span className="font-semibold">社区</span>
+          <span className="text-sm text-gray-500">交流分享</span>
+        </Link>
+        <Link
+          href="/knowledge"
+          className="flex flex-col items-center rounded-2xl bg-green-50 p-6 transition-transform hover:scale-105"
+        >
+          <span className="mb-2 text-4xl">📚</span>
+          <span className="font-semibold">知识库</span>
+          <span className="text-sm text-gray-500">育儿百科</span>
+        </Link>
+        <Link
+          href="/expert"
+          className="flex flex-col items-center rounded-2xl bg-purple-50 p-6 transition-transform hover:scale-105"
+        >
+          <span className="mb-2 text-4xl">👩‍⚕️</span>
+          <span className="font-semibold">专家咨询</span>
+          <span className="text-sm text-gray-500">在线问诊</span>
+        </Link>
+      </div>
+
+      <div className="rounded-2xl bg-gradient-to-r from-pink-100 to-purple-100 p-6">
+        <h2 className="mb-2 font-semibold">🎵 白噪音</h2>
+        <p className="mb-4 text-sm text-gray-600">帮助宝宝安然入睡</p>
+        <Link
+          href="/tools/white-noise"
+          className="inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-pink-500 shadow hover:bg-gray-50"
+        >
+          开始播放
+        </Link>
+      </div>
+    </div>
+  )
 }
