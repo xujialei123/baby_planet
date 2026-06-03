@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSupabaseUser } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { growthRecordSchema } from '@/lib/validators'
 import { calculatePercentile } from '@/lib/services/growth-calculator'
@@ -8,8 +7,8 @@ import { calculatePercentile } from '@/lib/services/growth-calculator'
 // 获取生长记录
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
@@ -35,8 +34,8 @@ export async function GET(req: Request) {
 // 添加生长记录
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 

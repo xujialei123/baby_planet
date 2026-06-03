@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSupabaseUser } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 
 /**
@@ -30,8 +29,8 @@ const CHINA_VACCINE_SCHEDULE = [
 // 为宝宝生成疫苗计划
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
@@ -91,8 +90,8 @@ export async function POST(req: Request) {
 // 获取宝宝的疫苗计划
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 

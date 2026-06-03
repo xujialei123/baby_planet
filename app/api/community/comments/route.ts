@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSupabaseUser } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { commentSchema } from '@/lib/validators'
 import { moderateContent } from '@/lib/services/content-filter'
@@ -43,12 +42,12 @@ export async function GET(req: Request) {
 // 创建评论
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = (session.user as any).id
+    const userId = user.id
     const body = await req.json()
     const data = commentSchema.parse(body)
 

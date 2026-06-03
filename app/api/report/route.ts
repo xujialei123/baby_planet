@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSupabaseUser } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 
 // 生成宝宝报告数据
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSupabaseUser } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { familySchema } from '@/lib/validators'
 import { nanoid } from '@/lib/utils'
@@ -8,14 +7,14 @@ import { nanoid } from '@/lib/utils'
 // 创建家庭
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
     const body = await req.json()
     const { name } = familySchema.parse(body)
-    const userId = (session.user as any).id
+    const userId = user.id
 
     // 检查用户是否已有家庭
     const existingMembership = await db.familyMember.findFirst({
@@ -58,12 +57,12 @@ export async function POST(req: Request) {
 // 获取当前用户的家庭信息
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = (session.user as any).id
+    const userId = user.id
 
     const membership = await db.familyMember.findFirst({
       where: { userId },

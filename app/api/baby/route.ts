@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSupabaseUser } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { babySchema } from '@/lib/validators'
 
 // 获取家庭的所有宝宝
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = (session.user as any).id
+    const userId = user.id
 
     const membership = await db.familyMember.findFirst({
       where: { userId },
@@ -37,12 +36,12 @@ export async function GET() {
 // 添加宝宝
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = (session.user as any).id
+    const userId = user.id
 
     const membership = await db.familyMember.findFirst({
       where: { userId },

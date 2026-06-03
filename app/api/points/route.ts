@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSupabaseUser } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { POINTS } from '@/lib/constants'
 
 // 获取积分信息
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = (session.user as any).id
+    const userId = user.id
 
     const [balance, transactions, freeConsultation] = await Promise.all([
       db.pointBalance.findUnique({ where: { userId } }),
@@ -48,12 +47,12 @@ export async function GET() {
 // 签到获取积分
 export async function POST() {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = (session.user as any).id
+    const userId = user.id
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 

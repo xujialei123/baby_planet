@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSupabaseUser } from '@/lib/auth-helpers'
 import { nanoid } from '@/lib/utils'
 
 // 支持两种存储后端：Cloudflare R2 或 Supabase Storage
@@ -9,8 +8,8 @@ const STORAGE_PROVIDER = process.env.STORAGE_PROVIDER || 'supabase' // 'r2' | 's
 // 获取预签名上传 URL
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    const user = await getSupabaseUser()
+    if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
