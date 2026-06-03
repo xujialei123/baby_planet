@@ -7,7 +7,7 @@ import { useAuth } from '@/components/layout/auth-provider'
 import { PageHeader } from '@/components/layout'
 import { Card, Button, Badge } from '@/components/ui'
 
-interface Record {
+interface DailyRecord {
   id: string
   type: string
   startTime: string
@@ -16,7 +16,7 @@ interface Record {
   notes: string | null
 }
 
-const RECORD_CONFIG: Record<string, { icon: string; label: string; color: 'primary' | 'lavender' | 'mint' | 'honey' | 'danger' }> = {
+const RECORD_CONFIG: { [key: string]: { icon: string; label: string; color: 'primary' | 'lavender' | 'mint' | 'honey' | 'danger' } } = {
   FEEDING: { icon: '🍼', label: '喂养', color: 'primary' },
   SLEEP: { icon: '😴', label: '睡眠', color: 'lavender' },
   DIAPER: { icon: '👶', label: '尿布', color: 'mint' },
@@ -39,7 +39,7 @@ function calculateDuration(start: string, end: string | null) {
 export default function RecordsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const [records, setRecords] = useState<Record[]>([])
+  const [records, setRecords] = useState<DailyRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [addLoading, setAddLoading] = useState(false)
