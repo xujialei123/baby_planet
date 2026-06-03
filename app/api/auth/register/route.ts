@@ -1,9 +1,36 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { nanoid } from '@/lib/utils'
 
 export async function POST(req: Request) {
   try {
     const { userId, email: userEmail, name: userName } = await req.json()
+
+    // 检查用户是否已有家庭
+    const existingMembership = await db.familyMember.findFirst({
+      where: { userId },
+    })
+
+    let familyId: string | null = null
+
+    // 如果没有家庭，自动创建一个
+    if (!existingMembership) {
+      const inviteCode = nanoid(8)
+      const family = await db.family.create({
+        data: {
+          name: userName ? `${userName}的家` : '我的家庭',
+          inviteCode,
+          ownerId: userId,
+          members: {
+            create: {
+              userId,
+              role: 'OWNER',
+            },
+          },
+        },
+      })
+      familyId = family.id
+    }
 
     // 创建积分账户
     const existingBalance = await db.pointBalance.findUnique({
@@ -52,7 +79,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: '用户资料创建成功',
-      data: { userId, email: userEmail, name: userName },
+      data: { userId, email: userEmail, name: userName, familyId },
     })
   } catch (error: unknown) {
     console.error('Register error:', error)

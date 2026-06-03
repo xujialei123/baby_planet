@@ -2,6 +2,49 @@ import { NextResponse } from 'next/server'
 import { getSupabaseUser } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { babySchema } from '@/lib/validators'
+import { nanoid } from '@/lib/utils'
+
+/**
+ * 获取或创建用户的家庭
+ */
+async function getOrCreateFamily(userId: string) {
+  // 查找用户所属的家庭
+  let membership = await db.familyMember.findFirst({
+    where: { userId },
+  })
+
+  if (membership) {
+    return membership
+  }
+
+  // 如果没有家庭，自动创建一个
+  const user = await db.user.findUnique({ where: { id: userId } })
+  const inviteCode = nanoid(8)
+
+  const family = await db.family.create({
+    data: {
+      name: user?.name ? `${user.name}的家` : '我的家庭',
+      inviteCode,
+      ownerId: userId,
+      members: {
+        create: {
+          userId,
+          role: 'OWNER',
+        },
+      },
+    },
+  })
+
+  return {
+    id: '',
+    familyId: family.id,
+    userId,
+    role: 'OWNER',
+    joinedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+}
 
 // 获取家庭的所有宝宝
 export async function GET() {
@@ -11,15 +54,7 @@ export async function GET() {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = user.id
-
-    const membership = await db.familyMember.findFirst({
-      where: { userId },
-    })
-
-    if (!membership) {
-      return NextResponse.json({ error: '未找到家庭' }, { status: 404 })
-    }
+    const membership = await getOrCreateFamily(user.id)
 
     const babies = await db.baby.findMany({
       where: { familyId: membership.familyId },
@@ -41,15 +76,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = user.id
-
-    const membership = await db.familyMember.findFirst({
-      where: { userId },
-    })
-
-    if (!membership) {
-      return NextResponse.json({ error: '未找到家庭' }, { status: 404 })
-    }
+    const membership = await getOrCreateFamily(user.id)
 
     // 检查宝宝数量上限
     const babyCount = await db.baby.count({

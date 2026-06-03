@@ -14,11 +14,10 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const { name } = familySchema.parse(body)
-    const userId = user.id
 
     // 检查用户是否已有家庭
     const existingMembership = await db.familyMember.findFirst({
-      where: { userId },
+      where: { userId: user.id },
     })
     if (existingMembership) {
       return NextResponse.json(
@@ -33,10 +32,10 @@ export async function POST(req: Request) {
       data: {
         name,
         inviteCode,
-        ownerId: userId,
+        ownerId: user.id,
         members: {
           create: {
-            userId,
+            userId: user.id,
             role: 'OWNER',
           },
         },
@@ -62,10 +61,9 @@ export async function GET() {
       return NextResponse.json({ error: '请先登录' }, { status: 401 })
     }
 
-    const userId = user.id
-
-    const membership = await db.familyMember.findFirst({
-      where: { userId },
+    // 查找用户所属的家庭
+    let membership = await db.familyMember.findFirst({
+      where: { userId: user.id },
       include: {
         family: {
           include: {
@@ -78,8 +76,41 @@ export async function GET() {
       },
     })
 
+    // 如果没有家庭，自动创建一个
     if (!membership) {
-      return NextResponse.json({ error: '未找到家庭' }, { status: 404 })
+      const inviteCode = nanoid(8)
+      const family = await db.family.create({
+        data: {
+          name: user.user_metadata?.name ? `${user.user_metadata.name}的家` : '我的家庭',
+          inviteCode,
+          ownerId: user.id,
+          members: {
+            create: {
+              userId: user.id,
+              role: 'OWNER',
+            },
+          },
+        },
+      })
+
+      // 重新查询以获取完整数据
+      membership = await db.familyMember.findFirst({
+        where: { userId: user.id },
+        include: {
+          family: {
+            include: {
+              members: {
+                include: { user: { select: { id: true, name: true, image: true } } },
+              },
+              babies: true,
+            },
+          },
+        },
+      })
+    }
+
+    if (!membership) {
+      return NextResponse.json({ error: '获取家庭信息失败' }, { status: 500 })
     }
 
     return NextResponse.json({
