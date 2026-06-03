@@ -4,8 +4,16 @@ const vapidPublicKey = process.env.VAPID_PUBLIC_KEY ?? ''
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY ?? ''
 const vapidMailto = process.env.VAPID_MAILTO ?? 'mailto:admin@babyplanet.com'
 
-if (vapidPublicKey && vapidPrivateKey) {
-  webPush.setVapidDetails(vapidMailto, vapidPublicKey, vapidPrivateKey)
+// 只在 VAPID 密钥有效时初始化
+let isVapidConfigured = false
+
+if (vapidPublicKey && vapidPrivateKey && vapidPublicKey.length > 20) {
+  try {
+    webPush.setVapidDetails(vapidMailto, vapidPublicKey, vapidPrivateKey)
+    isVapidConfigured = true
+  } catch (error) {
+    console.warn('VAPID key configuration failed:', error)
+  }
 }
 
 interface PushPayload {
@@ -26,6 +34,11 @@ export async function sendPushNotification(
   },
   payload: PushPayload
 ) {
+  if (!isVapidConfigured) {
+    console.warn('Push notifications not configured - VAPID keys missing')
+    return { success: false, error: 'Push notifications not configured' }
+  }
+
   try {
     const pushSubscription = {
       endpoint: subscription.endpoint,
