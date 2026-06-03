@@ -9,12 +9,12 @@ import { nanoid } from '@/lib/utils'
  */
 async function getOrCreateFamily(userId: string) {
   // 查找用户所属的家庭
-  let membership = await db.familyMember.findFirst({
+  const existingMembership = await db.familyMember.findFirst({
     where: { userId },
   })
 
-  if (membership) {
-    return membership
+  if (existingMembership) {
+    return existingMembership
   }
 
   // 如果没有家庭，自动创建一个
