@@ -6,6 +6,12 @@ import { useAuth } from '@/components/layout/auth-provider'
 import { PageHeader } from '@/components/layout'
 import { Card, Button, Input } from '@/components/ui'
 
+interface Circle {
+  id: string
+  name: string
+  icon: string | null
+}
+
 const POST_TYPES = [
   { value: 'DISCUSSION', label: '💬 讨论', description: '分享想法' },
   { value: 'QUESTION', label: '❓ 求助', description: '寻求帮助' },
@@ -13,16 +19,10 @@ const POST_TYPES = [
   { value: 'MILESTONE', label: '🎉 里程碑', description: '记录成长' },
 ]
 
-const CIRCLES = [
-  { id: '1', name: '新手妈妈', icon: '👶' },
-  { id: '2', name: '辅食交流', icon: '🍚' },
-  { id: '3', name: '睡眠训练', icon: '😴' },
-  { id: '4', name: '早教分享', icon: '📚' },
-]
-
 export default function NewPostPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const [circles, setCircles] = useState<Circle[]>([])
   const [form, setForm] = useState({
     circleId: '',
     type: 'DISCUSSION',
@@ -38,6 +38,25 @@ export default function NewPostPage() {
       router.push('/auth/login?redirect=/community/new')
     }
   }, [user, authLoading, router])
+
+  // 获取圈子列表
+  useEffect(() => {
+    const fetchCircles = async () => {
+      try {
+        // 使用默认圈子，因为没有圈子API
+        setCircles([
+          { id: 'newborn', name: '新手妈妈', icon: '👶' },
+          { id: 'food', name: '辅食交流', icon: '🍚' },
+          { id: 'sleep', name: '睡眠训练', icon: '😴' },
+          { id: 'education', name: '早教分享', icon: '📚' },
+        ])
+      } catch (error) {
+        console.error('获取圈子失败:', error)
+      }
+    }
+
+    fetchCircles()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,9 +76,8 @@ export default function NewPostPage() {
       }
 
       router.push('/community')
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : '发帖失败'
-      setError(errorMessage)
+    } catch (err: any) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -101,7 +119,7 @@ export default function NewPostPage() {
                 发布到
               </label>
               <div className="flex gap-2 overflow-x-auto">
-                {CIRCLES.map((circle) => (
+                {circles.map((circle) => (
                   <button
                     key={circle.id}
                     type="button"

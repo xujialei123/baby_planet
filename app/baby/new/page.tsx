@@ -18,6 +18,7 @@ export default function AddBabyPage() {
     birthHeight: '',
   })
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   // 如果未登录，重定向到登录页面
   useEffect(() => {
@@ -28,13 +29,31 @@ export default function AddBabyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     setLoading(true)
+
     try {
-      // TODO: 调用 API
-      console.log('Add baby:', form)
+      const response = await fetch('/api/baby', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          gender: form.gender,
+          birthday: form.birthday,
+          bloodType: form.bloodType || undefined,
+          birthWeight: form.birthWeight ? parseFloat(form.birthWeight) : undefined,
+          birthHeight: form.birthHeight ? parseFloat(form.birthHeight) : undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || '添加宝宝失败')
+      }
+
       router.push('/baby')
-    } catch (error) {
-      console.error(error)
+    } catch (err: any) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -69,6 +88,12 @@ export default function AddBabyPage() {
                 填写宝宝的基本信息
               </p>
             </div>
+
+            {error && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                {error}
+              </div>
+            )}
 
             <Input
               label="宝宝姓名"

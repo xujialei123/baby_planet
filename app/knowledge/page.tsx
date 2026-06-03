@@ -1,55 +1,54 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader, BottomNav } from '@/components/layout'
 import { Card, Badge, Input } from '@/components/ui'
 
-const CATEGORIES = [
-  { id: '1', name: '喂养营养', icon: '🍼', count: 45 },
-  { id: '2', name: '睡眠护理', icon: '😴', count: 32 },
-  { id: '3', name: '生长发育', icon: '📈', count: 28 },
-  { id: '4', name: '疫苗接种', icon: '💉', count: 18 },
-  { id: '5', name: '常见疾病', icon: '🏥', count: 25 },
-  { id: '6', name: '早教启蒙', icon: '📚', count: 36 },
-]
-
-const ARTICLES = [
-  {
-    id: '1',
-    title: '母乳喂养完全指南：从开奶到断奶',
-    category: '喂养营养',
-    excerpt: '详细介绍母乳喂养的正确姿势、常见问题及解决方案...',
-    views: 2345,
-    coverColor: 'bg-primary-100',
-  },
-  {
-    id: '2',
-    title: '宝宝辅食添加时间表与注意事项',
-    category: '喂养营养',
-    excerpt: '6个月开始添加辅食的科学方法，从米糊到多样化饮食...',
-    views: 1890,
-    coverColor: 'bg-mint-100',
-  },
-  {
-    id: '3',
-    title: '如何培养宝宝自主入睡能力',
-    category: '睡眠护理',
-    excerpt: '科学的睡眠训练方法，帮助宝宝建立健康的睡眠习惯...',
-    views: 1567,
-    coverColor: 'bg-lavender-100',
-  },
-]
+interface Article {
+  id: string
+  title: string
+  slug: string
+  excerpt: string | null
+  coverImage: string | null
+  category: string | null
+  tags: string[]
+  viewCount: number
+  publishedAt: string | null
+}
 
 export default function KnowledgePage() {
   const [search, setSearch] = useState('')
+  const [articles, setArticles] = useState<Article[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchArticles = async () => {
+      try {
+        const url = search
+          ? `/api/knowledge?search=${encodeURIComponent(search)}`
+          : '/api/knowledge'
+        const response = await fetch(url)
+        if (response.ok) {
+          const data = await response.json()
+          setArticles(data.articles || [])
+        }
+      } catch (error) {
+        console.error('获取文章失败:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchArticles()
+  }, [search])
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
       <PageHeader title="知识库" />
 
       {/* 搜索框 */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-4 pt-4">
         <Input
           placeholder="搜索育儿知识..."
           value={search}
@@ -58,50 +57,60 @@ export default function KnowledgePage() {
         />
       </div>
 
-      {/* 分类网格 */}
-      <div className="px-4 pb-4">
-        <h3 className="mb-2 text-sm font-semibold text-neutral-600">知识分类</h3>
-        <div className="grid grid-cols-3 gap-2">
-          {CATEGORIES.map((cat) => (
-            <Link key={cat.id} href={`/knowledge/categories/${cat.id}`}>
-              <Card variant="outlined" padding="sm" className="text-center">
-                <p className="text-2xl">{cat.icon}</p>
-                <p className="mt-1 text-xs font-medium text-neutral-700">
-                  {cat.name}
-                </p>
-                <p className="text-[10px] text-neutral-400">{cat.count}篇</p>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* 热门文章 */}
+      {/* 文章列表 */}
       <div className="px-4">
-        <h3 className="mb-2 text-sm font-semibold text-neutral-600">推荐文章</h3>
-        <div className="flex flex-col gap-3">
-          {ARTICLES.map((article) => (
-            <Link key={article.id} href={`/knowledge/${article.id}`}>
-              <Card variant="elevated" padding="none">
-                <div className={`h-24 ${article.coverColor} rounded-t-lg`} />
-                <div className="p-3">
-                  <Badge variant="primary" size="sm" className="mb-1">
-                    {article.category}
-                  </Badge>
-                  <h4 className="font-semibold text-neutral-800">
-                    {article.title}
-                  </h4>
-                  <p className="mt-1 text-sm text-neutral-500 line-clamp-2">
-                    {article.excerpt}
-                  </p>
-                  <p className="mt-2 text-xs text-neutral-400">
-                    👁️ {article.views} 次阅读
-                  </p>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="mb-4 text-4xl">📚</div>
+            <p className="text-gray-600">加载中...</p>
+          </div>
+        ) : articles.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {articles.map((article) => (
+              <Link key={article.id} href={`/knowledge/${article.slug}`}>
+                <Card variant="elevated" padding="none">
+                  {article.coverImage ? (
+                    <img
+                      src={article.coverImage}
+                      alt={article.title}
+                      className="h-32 w-full rounded-t-lg object-cover"
+                    />
+                  ) : (
+                    <div className="h-24 bg-gradient-to-r from-primary-100 to-mint-100 rounded-t-lg" />
+                  )}
+                  <div className="p-3">
+                    {article.category && (
+                      <Badge variant="primary" size="sm" className="mb-1">
+                        {article.category}
+                      </Badge>
+                    )}
+                    <h4 className="font-semibold text-neutral-800">
+                      {article.title}
+                    </h4>
+                    {article.excerpt && (
+                      <p className="mt-1 text-sm text-neutral-500 line-clamp-2">
+                        {article.excerpt}
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs text-neutral-400">
+                      👁️ {article.viewCount} 次阅读
+                    </p>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-5xl">📚</p>
+            <h3 className="mt-4 text-lg font-bold text-neutral-700">
+              {search ? '没有找到相关文章' : '暂无文章'}
+            </h3>
+            <p className="mt-1 text-sm text-neutral-500">
+              {search ? '试试其他关键词' : '知识库正在建设中...'}
+            </p>
+          </div>
+        )}
       </div>
 
       <BottomNav />

@@ -6,22 +6,26 @@ import { useAuth } from '@/components/layout/auth-provider'
 import { PageHeader } from '@/components/layout'
 import { Card, Button, Input } from '@/components/ui'
 
-// 模拟生长数据
-const MOCK_GROWTH_DATA = [
-  { date: '2025-01', weight: 3.5, height: 50, weightP: 50, heightP: 55 },
-  { date: '2025-02', weight: 4.2, height: 54, weightP: 55, heightP: 50 },
-  { date: '2025-03', weight: 5.1, height: 58, weightP: 60, heightP: 52 },
-  { date: '2025-04', weight: 5.8, height: 61, weightP: 58, heightP: 55 },
-  { date: '2025-05', weight: 6.3, height: 63, weightP: 55, heightP: 50 },
-  { date: '2025-06', weight: 6.8, height: 65, weightP: 52, heightP: 48 },
-]
+interface GrowthRecord {
+  id: string
+  date: string
+  weight: number | null
+  height: number | null
+  headCircumference: number | null
+  weightPercentile: number | null
+  heightPercentile: number | null
+  headPercentile: number | null
+}
 
 export default function GrowthPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const [records, setRecords] = useState<GrowthRecord[]>([])
+  const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [addLoading, setAddLoading] = useState(false)
   const [newRecord, setNewRecord] = useState({
-    date: '',
+    date: new Date().toISOString().split('T')[0],
     weight: '',
     height: '',
     headCircumference: '',
@@ -34,8 +38,66 @@ export default function GrowthPage({ params }: { params: { id: string } }) {
     }
   }, [user, authLoading, router, params.id])
 
+  // 获取生长记录
+  useEffect(() => {
+    const fetchRecords = async () => {
+      try {
+        const response = await fetch(`/api/growth?babyId=${params.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          setRecords(data || [])
+        }
+      } catch (error) {
+        console.error('获取生长记录失败:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchRecords()
+    }
+  }, [user, params.id])
+
+  // 添加生长记录
+  const handleAddRecord = async () => {
+    setAddLoading(true)
+    try {
+      const response = await fetch('/api/growth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          babyId: params.id,
+          date: newRecord.date,
+          weight: newRecord.weight ? parseFloat(newRecord.weight) : undefined,
+          height: newRecord.height ? parseFloat(newRecord.height) : undefined,
+          headCircumference: newRecord.headCircumference ? parseFloat(newRecord.headCircumference) : undefined,
+        }),
+      })
+
+      if (response.ok) {
+        const record = await response.json()
+        setRecords([...records, record])
+        setShowAdd(false)
+        setNewRecord({
+          date: new Date().toISOString().split('T')[0],
+          weight: '',
+          height: '',
+          headCircumference: '',
+        })
+      }
+    } catch (error) {
+      console.error('添加生长记录失败:', error)
+    } finally {
+      setAddLoading(false)
+    }
+  }
+
+  // 获取最新记录
+  const latestRecord = records.length > 0 ? records[records.length - 1] : null
+
   // 加载中显示
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -67,39 +129,30 @@ export default function GrowthPage({ params }: { params: { id: string } }) {
       <div className="grid grid-cols-3 gap-2 p-4">
         <Card variant="elevated" padding="sm" className="text-center">
           <p className="text-xs text-neutral-500">体重</p>
-          <p className="text-xl font-bold text-primary-600">6.8</p>
-          <p className="text-xs text-neutral-400">kg · P52</p>
+          <p className="text-xl font-bold text-primary-600">
+            {latestRecord?.weight ?? '--'}
+          </p>
+          <p className="text-xs text-neutral-400">
+            kg {latestRecord?.weightPercentile ? `· P${latestRecord.weightPercentile}` : ''}
+          </p>
         </Card>
         <Card variant="elevated" padding="sm" className="text-center">
           <p className="text-xs text-neutral-500">身高</p>
-          <p className="text-xl font-bold text-mint-600">65</p>
-          <p className="text-xs text-neutral-400">cm · P48</p>
+          <p className="text-xl font-bold text-mint-600">
+            {latestRecord?.height ?? '--'}
+          </p>
+          <p className="text-xs text-neutral-400">
+            cm {latestRecord?.heightPercentile ? `· P${latestRecord.heightPercentile}` : ''}
+          </p>
         </Card>
         <Card variant="elevated" padding="sm" className="text-center">
           <p className="text-xs text-neutral-500">头围</p>
-          <p className="text-xl font-bold text-lavender-600">42</p>
-          <p className="text-xs text-neutral-400">cm · P50</p>
-        </Card>
-      </div>
-
-      {/* 体重曲线图 */}
-      <div className="px-4 pb-4">
-        <Card variant="outlined" padding="md">
-          <h3 className="mb-3 font-semibold text-neutral-700">体重变化趋势</h3>
-          <div className="flex items-end justify-between gap-1" style={{ height: '160px' }}>
-            {MOCK_GROWTH_DATA.map((item, index) => (
-              <div key={index} className="flex flex-1 flex-col items-center gap-1">
-                <span className="text-xs text-neutral-500">{item.weight}kg</span>
-                <div
-                  className="w-full rounded-t-sm bg-primary-300 transition-all"
-                  style={{ height: `${(item.weight / 10) * 140}px` }}
-                />
-                <span className="text-[10px] text-neutral-400">
-                  {item.date.split('-')[1]}月
-                </span>
-              </div>
-            ))}
-          </div>
+          <p className="text-xl font-bold text-lavender-600">
+            {latestRecord?.headCircumference ?? '--'}
+          </p>
+          <p className="text-xs text-neutral-400">
+            cm {latestRecord?.headPercentile ? `· P${latestRecord.headPercentile}` : ''}
+          </p>
         </Card>
       </div>
 
@@ -128,19 +181,29 @@ export default function GrowthPage({ params }: { params: { id: string } }) {
       <div className="px-4">
         <h3 className="mb-2 text-sm font-semibold text-neutral-600">历史记录</h3>
         <div className="flex flex-col gap-2">
-          {MOCK_GROWTH_DATA.reverse().map((item, index) => (
-            <Card key={index} variant="outlined" padding="sm">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-neutral-700">
-                  {item.date}
-                </span>
-                <div className="flex gap-4 text-sm text-neutral-500">
-                  <span>{item.weight}kg</span>
-                  <span>{item.height}cm</span>
+          {records.length > 0 ? (
+            records.reverse().map((record) => (
+              <Card key={record.id} variant="outlined" padding="sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-neutral-700">
+                    {new Date(record.date).toLocaleDateString('zh-CN')}
+                  </span>
+                  <div className="flex gap-4 text-sm text-neutral-500">
+                    {record.weight && <span>{record.weight}kg</span>}
+                    {record.height && <span>{record.height}cm</span>}
+                    {record.headCircumference && <span>头围{record.headCircumference}cm</span>}
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <p className="text-4xl">📈</p>
+              <p className="mt-2 text-sm text-neutral-500">
+                还没有生长记录，点击上方按钮添加
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -189,7 +252,9 @@ export default function GrowthPage({ params }: { params: { id: string } }) {
                   setNewRecord({ ...newRecord, headCircumference: e.target.value })
                 }
               />
-              <Button onClick={() => setShowAdd(false)}>保存</Button>
+              <Button onClick={handleAddRecord} loading={addLoading}>
+                保存
+              </Button>
             </div>
           </div>
         </div>

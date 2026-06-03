@@ -4,28 +4,19 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/components/layout/auth-provider'
-import { PageHeader } from '@/components/layout'
+import { PageHeader, BottomNav } from '@/components/layout'
 import { Card, Button, Avatar, Badge } from '@/components/ui'
 
-// 模拟数据
-const MOCK_BABIES = [
-  {
-    id: '1',
-    name: '小豆豆',
-    gender: 'FEMALE' as const,
-    birthday: '2025-01-15',
-    avatarUrl: null,
-  },
-  {
-    id: '2',
-    name: '大宝',
-    gender: 'MALE' as const,
-    birthday: '2023-06-20',
-    avatarUrl: null,
-  },
-]
+interface Baby {
+  id: string
+  name: string
+  gender: string
+  birthday: string | null
+  avatarUrl: string | null
+}
 
-function getAgeText(birthday: string) {
+function getAgeText(birthday: string | null) {
+  if (!birthday) return '未设置生日'
   const birth = new Date(birthday)
   const now = new Date()
   const months =
@@ -41,7 +32,8 @@ function getAgeText(birthday: string) {
 export default function BabyListPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const [babies] = useState(MOCK_BABIES)
+  const [babies, setBabies] = useState<Baby[]>([])
+  const [loading, setLoading] = useState(true)
 
   // 如果未登录，重定向到登录页面
   useEffect(() => {
@@ -50,8 +42,29 @@ export default function BabyListPage() {
     }
   }, [user, authLoading, router])
 
+  // 获取宝宝列表
+  useEffect(() => {
+    const fetchBabies = async () => {
+      try {
+        const response = await fetch('/api/baby')
+        if (response.ok) {
+          const data = await response.json()
+          setBabies(data)
+        }
+      } catch (error) {
+        console.error('获取宝宝列表失败:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchBabies()
+    }
+  }, [user])
+
   // 加载中显示
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -68,7 +81,7 @@ export default function BabyListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 pb-20">
+    <div className="min-h-screen bg-neutral-50 pb-24">
       <PageHeader
         title="我的宝宝"
         action={
@@ -82,11 +95,11 @@ export default function BabyListPage() {
         {babies.map((baby) => (
           <Link key={baby.id} href={`/baby/${baby.id}/records`}>
             <Card variant="elevated" className="flex items-center gap-4">
-              <Avatar alt={baby.name} size="lg" />
+              <Avatar alt={baby.name} size="lg" src={baby.avatarUrl} />
               <div className="flex-1">
                 <h3 className="font-bold text-neutral-800">{baby.name}</h3>
                 <p className="text-sm text-neutral-500">
-                  {baby.gender === 'FEMALE' ? '👧' : '👦'} {getAgeText(baby.birthday)}
+                  {baby.gender === 'FEMALE' ? '👧' : baby.gender === 'MALE' ? '👦' : '🤷'} {getAgeText(baby.birthday)}
                 </p>
               </div>
               <Badge variant="mint">{getAgeText(baby.birthday)}</Badge>
@@ -109,6 +122,8 @@ export default function BabyListPage() {
           </div>
         )}
       </div>
+
+      <BottomNav />
     </div>
   )
 }

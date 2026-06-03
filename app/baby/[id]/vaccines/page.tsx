@@ -6,29 +6,33 @@ import { useAuth } from '@/components/layout/auth-provider'
 import { PageHeader } from '@/components/layout'
 import { Card, Badge, Button } from '@/components/ui'
 
-// 模拟疫苗数据
-const MOCK_VACCINES = [
-  { id: '1', name: '乙肝疫苗', age: '出生', status: 'completed', date: '2025-01-15', hospital: '市妇幼保健院' },
-  { id: '2', name: '卡介苗', age: '出生', status: 'completed', date: '2025-01-15', hospital: '市妇幼保健院' },
-  { id: '3', name: '脊灰疫苗(第1剂)', age: '2月龄', status: 'completed', date: '2025-03-15', hospital: '社区卫生中心' },
-  { id: '4', name: '百白破疫苗(第1剂)', age: '3月龄', status: 'completed', date: '2025-04-15', hospital: '社区卫生中心' },
-  { id: '5', name: '脊灰疫苗(第2剂)', age: '3月龄', status: 'upcoming', date: '2025-07-15', hospital: '' },
-  { id: '6', name: '百白破疫苗(第2剂)', age: '4月龄', status: 'pending', date: '2025-08-15', hospital: '' },
-  { id: '7', name: '乙肝疫苗(第2剂)', age: '1月龄', status: 'pending', date: '2025-09-15', hospital: '' },
-]
+interface VaccineRecord {
+  id: string
+  status: string
+  scheduledDate: string | null
+  actualDate: string | null
+  notes: string | null
+  hospital: string | null
+  vaccine: {
+    id: string
+    name: string
+    description: string | null
+    recommendedAgeMonths: number
+  } | null
+}
 
-const STATUS_CONFIG = {
-  completed: { label: '已接种', color: 'mint' as const, icon: '✅' },
-  upcoming: { label: '即将到期', color: 'honey' as const, icon: '⏰' },
-  pending: { label: '待接种', color: 'default' as const, icon: '⏳' },
-  overdue: { label: '已过期', color: 'danger' as const, icon: '⚠️' },
+const STATUS_CONFIG: Record<string, { label: string; color: 'mint' | 'honey' | 'default' | 'danger'; icon: string }> = {
+  completed: { label: '已接种', color: 'mint', icon: '✅' },
+  upcoming: { label: '即将到期', color: 'honey', icon: '⏰' },
+  pending: { label: '待接种', color: 'default', icon: '⏳' },
+  overdue: { label: '已过期', color: 'danger', icon: '⚠️' },
 }
 
 export default function VaccinesPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const [vaccines] = useState(MOCK_VACCINES)
-  const upcomingCount = vaccines.filter((v) => v.status === 'upcoming').length
+  const [vaccines, setVaccines] = useState<VaccineRecord[]>([])
+  const [loading, setLoading] = useState(true)
 
   // 如果未登录，重定向到登录页面
   useEffect(() => {
@@ -37,8 +41,55 @@ export default function VaccinesPage({ params }: { params: { id: string } }) {
     }
   }, [user, authLoading, router, params.id])
 
+  // 获取疫苗记录
+  useEffect(() => {
+    const fetchVaccines = async () => {
+      try {
+        const response = await fetch(`/api/vaccines?babyId=${params.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          setVaccines(data || [])
+        }
+      } catch (error) {
+        console.error('获取疫苗记录失败:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchVaccines()
+    }
+  }, [user, params.id])
+
+  // 标记已接种
+  const handleMarkCompleted = async (id: string) => {
+    try {
+      const response = await fetch(`/api/vaccines/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'completed',
+          actualDate: new Date().toISOString(),
+        }),
+      })
+
+      if (response.ok) {
+        setVaccines(vaccines.map(v =>
+          v.id === id ? { ...v, status: 'completed', actualDate: new Date().toISOString() } : v
+        ))
+      }
+    } catch (error) {
+      console.error('更新疫苗状态失败:', error)
+    }
+  }
+
+  const upcomingCount = vaccines.filter((v) => v.status === 'upcoming' || v.status === 'overdue').length
+  const completedCount = vaccines.filter((v) => v.status === 'completed').length
+  const pendingCount = vaccines.filter((v) => v.status === 'pending').length
+
   // 加载中显示
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -62,21 +113,17 @@ export default function VaccinesPage({ params }: { params: { id: string } }) {
       <div className="grid grid-cols-3 gap-2 p-4">
         <Card variant="elevated" padding="sm" className="text-center">
           <p className="text-2xl">✅</p>
-          <p className="text-lg font-bold text-mint-600">
-            {vaccines.filter((v) => v.status === 'completed').length}
-          </p>
+          <p className="text-lg font-bold text-mint-600">{completedCount}</p>
           <p className="text-xs text-neutral-500">已接种</p>
         </Card>
         <Card variant="elevated" padding="sm" className="text-center">
           <p className="text-2xl">⏰</p>
           <p className="text-lg font-bold text-honey-600">{upcomingCount}</p>
-          <p className="text-xs text-neutral-500">即将到期</p>
+          <p className="text-xs text-neutral-500">待处理</p>
         </Card>
         <Card variant="elevated" padding="sm" className="text-center">
           <p className="text-2xl">⏳</p>
-          <p className="text-lg font-bold text-neutral-600">
-            {vaccines.filter((v) => v.status === 'pending').length}
-          </p>
+          <p className="text-lg font-bold text-neutral-600">{pendingCount}</p>
           <p className="text-xs text-neutral-500">待接种</p>
         </Card>
       </div>
@@ -88,7 +135,7 @@ export default function VaccinesPage({ params }: { params: { id: string } }) {
             <span className="text-lg">⏰</span>
             <div>
               <p className="font-semibold text-honey-800">
-                有 {upcomingCount} 个疫苗即将到期
+                有 {upcomingCount} 个疫苗需要处理
               </p>
               <p className="text-sm text-honey-600">
                 请及时带宝宝前往接种
@@ -102,39 +149,55 @@ export default function VaccinesPage({ params }: { params: { id: string } }) {
       <div className="px-4">
         <h3 className="mb-2 text-sm font-semibold text-neutral-600">接种计划</h3>
         <div className="flex flex-col gap-2">
-          {vaccines.map((vaccine) => {
-            const config = STATUS_CONFIG[vaccine.status as keyof typeof STATUS_CONFIG]
-            return (
-              <Card key={vaccine.id} variant="outlined" padding="sm">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-lg">
-                    {config.icon}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-neutral-800">
-                        {vaccine.name}
-                      </span>
-                      <Badge variant={config.color}>{config.label}</Badge>
+          {vaccines.length > 0 ? (
+            vaccines.map((record) => {
+              const config = STATUS_CONFIG[record.status] || STATUS_CONFIG.pending
+              return (
+                <Card key={record.id} variant="outlined" padding="sm">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-lg">
+                      {config.icon}
                     </div>
-                    <p className="text-sm text-neutral-500">
-                      推荐时间：{vaccine.age} · {vaccine.date}
-                    </p>
-                    {vaccine.hospital && (
-                      <p className="text-xs text-neutral-400">
-                        📍 {vaccine.hospital}
-                      </p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-neutral-800">
+                          {record.vaccine?.name || '未知疫苗'}
+                        </span>
+                        <Badge variant={config.color}>{config.label}</Badge>
+                      </div>
+                      {record.scheduledDate && (
+                        <p className="text-sm text-neutral-500">
+                          计划时间：{new Date(record.scheduledDate).toLocaleDateString('zh-CN')}
+                        </p>
+                      )}
+                      {record.hospital && (
+                        <p className="text-xs text-neutral-400">
+                          📍 {record.hospital}
+                        </p>
+                      )}
+                      {record.notes && (
+                        <p className="text-xs text-neutral-400 mt-1">
+                          {record.notes}
+                        </p>
+                      )}
+                    </div>
+                    {(record.status === 'upcoming' || record.status === 'overdue') && (
+                      <Button size="sm" variant="ghost" onClick={() => handleMarkCompleted(record.id)}>
+                        标记已接种
+                      </Button>
                     )}
                   </div>
-                  {vaccine.status === 'upcoming' && (
-                    <Button size="sm" variant="ghost">
-                      标记已接种
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            )
-          })}
+                </Card>
+              )
+            })
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <p className="text-4xl">💉</p>
+              <p className="mt-2 text-sm text-neutral-500">
+                暂无疫苗计划
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
